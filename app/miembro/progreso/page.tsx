@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { FormularioRegistroProgreso } from "@/components/progreso/formulario-registro-progreso";
+import { VistaEvolucion } from "@/components/progreso/vista-evolucion";
 
 export const metadata: Metadata = { title: "Mi progreso | Madlions" };
 
@@ -13,7 +14,7 @@ export default function ProgresoPage() {
         </p>
       </div>
       <FormularioRegistroProgreso />
-      {/* FE-16.2 incorporará aquí la gráfica y el historial. */}
+      <VistaEvolucion />
     </main>
   );
 }
