@@ -1,16 +1,18 @@
 'use client';
 
-import { useState, useTransition, type FormEvent } from 'react';
+import { useCallback, useState, useTransition, type FormEvent } from 'react';
 import { guardarTipoClase } from '@/app/actions/clases';
 import { validarTipoClase, type ErroresFormulario, type TipoClase } from '@/lib/clases';
 import { Modal } from './modal';
+import { Notificacion } from './notificacion';
 import { botonPrimarioCss, botonSecundarioCss, campoCss, errorCampoCss } from './estilos';
 
 /** FE-4.1: catálogo de tipos de clase del administrador. */
 export function TiposClase({ tipos }: { tipos: TipoClase[] }) {
   // undefined = modal cerrado; null = tipo nuevo; TipoClase = edición.
   const [editando, setEditando] = useState<TipoClase | null | undefined>(undefined);
-  const [aviso, setAviso] = useState('');
+  const [aviso, setAviso] = useState<{ texto: string; id: number } | null>(null);
+  const cerrarAviso = useCallback(() => setAviso(null), []);
 
   return (
     <div className="flex flex-col gap-4">
@@ -25,17 +27,14 @@ export function TiposClase({ tipos }: { tipos: TipoClase[] }) {
           type="button"
           className={botonPrimarioCss}
           onClick={() => {
-            setAviso('');
+            setAviso(null);
             setEditando(null);
           }}
         >
           Nuevo tipo de clase
         </button>
       </div>
-
-      <p aria-live="polite" className="min-h-5 text-sm text-green-700 dark:text-green-400">
-        {aviso}
-      </p>
+      {aviso && <Notificacion key={aviso.id} mensaje={aviso.texto} onCerrar={cerrarAviso} />}
 
       {tipos.length === 0 ? (
         <p className="rounded-lg border border-dashed border-zinc-300 p-8 text-center text-sm text-zinc-500 dark:border-zinc-700">
@@ -61,7 +60,7 @@ export function TiposClase({ tipos }: { tipos: TipoClase[] }) {
                       type="button"
                       className={botonSecundarioCss}
                       onClick={() => {
-                        setAviso('');
+                        setAviso(null);
                         setEditando(tipo);
                       }}
                     >
@@ -83,7 +82,7 @@ export function TiposClase({ tipos }: { tipos: TipoClase[] }) {
           onCerrar={() => setEditando(undefined)}
           onGuardado={(mensaje) => {
             setEditando(undefined);
-            setAviso(mensaje);
+            setAviso({ texto: mensaje, id: Date.now() });
           }}
         />
       )}
