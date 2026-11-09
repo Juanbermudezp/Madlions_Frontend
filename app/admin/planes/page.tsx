@@ -12,21 +12,27 @@ export const metadata: Metadata = { title: 'Planes | Madlions' };
 export default async function Page() {
   let planes: Plan[] | null = null;
   let tipos: TipoClase[] | null = null;
+  let precioClasePuntual: string | null = null;
   let error = '';
   let sesionVencida = false;
 
   try {
-    [planes, tipos] = await Promise.all([
+    let configuracion: { precio: string };
+    [planes, tipos, configuracion] = await Promise.all([
       api<Plan[]>('planes'),
       api<TipoClase[]>('tipos-clase'),
+      api<{ precio: string }>('configuracion/precio-clase-puntual'),
     ]);
+    precioClasePuntual = configuracion.precio;
   } catch (e) {
     if (e instanceof SesionInvalidaError) sesionVencida = true;
     else error = e instanceof Error ? e.message : '';
   }
 
   if (sesionVencida) redirect('/login');
-  if (!planes || !tipos) return <ErrorCarga mensaje={`No se pudieron cargar los planes. ${error}`} />;
+  if (!planes || !tipos || precioClasePuntual === null) {
+    return <ErrorCarga mensaje={`No se pudieron cargar los planes. ${error}`} />;
+  }
 
-  return <Planes planes={planes} tiposClase={tipos} />;
+  return <Planes planes={planes} tiposClase={tipos} precioClasePuntual={precioClasePuntual} />;
 }

@@ -14,6 +14,7 @@ import {
 } from '@/lib/planes';
 import { Modal } from '@/components/clases/modal';
 import { Notificacion } from '@/components/clases/notificacion';
+import { PrecioClasePuntual } from './precio-clase-puntual';
 import {
   botonPrimarioCss,
   botonSecundarioCss,
@@ -22,7 +23,15 @@ import {
 } from '@/components/clases/estilos';
 
 /** FE-1.1 y FE-1.2: administración de planes. */
-export function Planes({ planes, tiposClase }: { planes: Plan[]; tiposClase: TipoClase[] }) {
+export function Planes({
+  planes,
+  tiposClase,
+  precioClasePuntual,
+}: {
+  planes: Plan[];
+  tiposClase: TipoClase[];
+  precioClasePuntual: string;
+}) {
   // undefined = modal cerrado; null = plan nuevo; Plan = edición.
   const [editando, setEditando] = useState<Plan | null | undefined>(undefined);
   const [porDesactivar, setPorDesactivar] = useState<Plan | null>(null);
@@ -54,6 +63,8 @@ export function Planes({ planes, tiposClase }: { planes: Plan[]; tiposClase: Tip
         </button>
       </div>
       {aviso && <Notificacion key={aviso.id} mensaje={aviso.texto} onCerrar={cerrarAviso} />}
+
+      <PrecioClasePuntual precio={precioClasePuntual} onGuardado={avisar} />
 
       {planes.length === 0 ? (
         <p className="rounded-lg border border-dashed border-zinc-300 p-8 text-center text-sm text-zinc-500 dark:border-zinc-700">

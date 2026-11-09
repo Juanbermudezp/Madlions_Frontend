@@ -4,7 +4,12 @@ import { revalidatePath } from 'next/cache';
 import { api, ApiError, SesionInvalidaError } from '@/lib/api';
 import { obtenerUsuario } from '@/lib/dal';
 import type { ResultadoAccion } from '@/lib/clases';
-import { campoDelMensajePlan, validarPlan, type DatosPlan } from '@/lib/planes';
+import {
+  campoDelMensajePlan,
+  validarPlan,
+  validarPrecioClasePuntual,
+  type DatosPlan,
+} from '@/lib/planes';
 
 /**
  * Server Actions de la administración de planes (H1).
@@ -92,4 +97,28 @@ export async function desactivarPlan(id: string): Promise<ResultadoAccion> {
 
   revalidatePath('/admin/planes');
   return { ok: true, mensaje: 'Plan desactivado' };
+}
+
+/** FE-1.3: cambia el precio de la clase puntual que usa el Módulo 3. */
+export async function guardarPrecioClasePuntual(precio: string): Promise<ResultadoAccion> {
+  const denegado = await verificarAdministrador();
+  if (denegado) return denegado;
+
+  const invalido = validarPrecioClasePuntual(precio);
+  if (invalido) return { ok: false, error: invalido, campo: 'precio' };
+
+  try {
+    await api('configuracion/precio-clase-puntual', {
+      method: 'PUT',
+      body: { precio: Number(precio.trim()) },
+    });
+  } catch (error) {
+    return traducirError(error);
+  }
+
+  revalidatePath('/admin/planes');
+  return {
+    ok: true,
+    mensaje: 'Precio actualizado. Se aplicará a las sesiones que se agenden desde ahora',
+  };
 }

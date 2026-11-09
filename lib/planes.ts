@@ -90,6 +90,16 @@ export function validarPlan(datos: DatosPlan): ErroresFormulario {
   return errores;
 }
 
+export const PRECIO_INVALIDO = 'El precio debe ser mayor que 0 y tener como máximo 2 decimales.';
+
+/** FE-1.3: el precio de la clase puntual sigue la misma regla que el backend. */
+export function validarPrecioClasePuntual(precio: string): string | null {
+  const valor = precio.trim();
+  return PRECIO.test(valor) && Number(valor) > 0 && Number(valor) <= PRECIO_MAXIMO
+    ? null
+    : PRECIO_INVALIDO;
+}
+
 /**
  * Campo del formulario al que corresponde un mensaje de error del backend,
  * para mostrarlo junto al campo y no solo arriba del formulario.
