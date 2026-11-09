@@ -86,6 +86,7 @@ export const MENU_POR_ROL: Record<Rol, OpcionMenu[]> = {
   ADMINISTRADOR: [
     { etiqueta: 'Planes', href: '/admin/planes', historia: 'H1' },
     { etiqueta: 'Clases', href: '/admin/clases', historia: 'H4' },
+    { etiqueta: 'Tipos de clase', href: '/admin/tipos-clase', historia: 'H4' },
     { etiqueta: 'Miembros', href: '/admin/miembros', historia: 'H2' },
     { etiqueta: 'Cobros pendientes', href: '/admin/cobros', historia: 'H13' },
     { etiqueta: 'Estado del equipo', href: '/admin/equipo', historia: 'H17' },
