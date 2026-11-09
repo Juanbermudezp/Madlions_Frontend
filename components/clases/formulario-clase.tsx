@@ -172,7 +172,15 @@ export function FormularioClase({
           </div>
         </div>
         {(errores.fecha || errores.horario) && (
-          <p className={`${errorCampoCss} -mt-2`}>{errores.fecha ?? errores.horario}</p>
+          <div className="-mt-2">
+            <p className={errorCampoCss}>{errores.fecha ?? errores.horario}</p>
+            {errores.horario?.startsWith('El entrenador ya tiene') && (
+              <p className="mt-1 text-xs text-zinc-500">
+                Puede ser otra clase o un bloque de disponibilidad del entrenador para sesiones
+                personales.
+              </p>
+            )}
+          </div>
         )}
 
         <div>
