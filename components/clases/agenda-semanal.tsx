@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   diasDeLaSemana,
   esModificable,
@@ -19,6 +19,7 @@ import {
 } from '@/lib/clases';
 import { FormularioClase } from './formulario-clase';
 import { Modal } from './modal';
+import { Notificacion } from './notificacion';
 import { botonPrimarioCss, botonSecundarioCss } from './estilos';
 
 const PRIMERA_HORA = 5;
@@ -52,7 +53,8 @@ export function AgendaSemanal({
   editable: boolean;
 }) {
   const [seleccion, setSeleccion] = useState<Seleccion | null>(null);
-  const [aviso, setAviso] = useState('');
+  const [aviso, setAviso] = useState<{ texto: string; id: number } | null>(null);
+  const cerrarAviso = useCallback(() => setAviso(null), []);
 
   const dias = diasDeLaSemana(lunes);
   const porDia = new Map(dias.map((dia) => [dia, [] as ClaseAgenda[]]));
@@ -62,7 +64,7 @@ export function AgendaSemanal({
   const fechaSugerida = semanaDeHoy ? hoy : lunes;
 
   function abrir(clase: ClaseAgenda) {
-    setAviso('');
+    setAviso(null);
     setSeleccion({ modo: 'ver', clase });
   }
 
@@ -95,7 +97,7 @@ export function AgendaSemanal({
               type="button"
               className={botonPrimarioCss}
               onClick={() => {
-                setAviso('');
+                setAviso(null);
                 setSeleccion({ modo: 'nueva' });
               }}
             >
@@ -104,10 +106,7 @@ export function AgendaSemanal({
           )}
         </div>
       </div>
-
-      <p aria-live="polite" className="min-h-5 text-sm text-green-700 dark:text-green-400">
-        {aviso}
-      </p>
+      {aviso && <Notificacion key={aviso.id} mensaje={aviso.texto} onCerrar={cerrarAviso} />}
 
       {clases.length === 0 && (
         <p className="rounded-lg border border-dashed border-zinc-300 p-6 text-center text-sm text-zinc-500 dark:border-zinc-700">
@@ -185,7 +184,7 @@ export function AgendaSemanal({
           onCerrar={() => setSeleccion(null)}
           onGuardado={(mensaje) => {
             setSeleccion(null);
-            setAviso(mensaje);
+            setAviso({ texto: mensaje, id: Date.now() });
           }}
         />
       )}
@@ -201,7 +200,7 @@ export function AgendaSemanal({
             onCerrar={() => setSeleccion(null)}
             onGuardado={(mensaje) => {
               setSeleccion(null);
-              setAviso(mensaje);
+              setAviso({ texto: mensaje, id: Date.now() });
             }}
           />
         ) : (
