@@ -41,11 +41,13 @@ export type Resultado<T> =
     | { ok: false; error: string; estado?: number };
 
 export const RUTA_MIS_PAGOS = '/miembro/pagos';
+export const RUTA_AGENDAR = '/miembro/sesiones/agendar';
 
 export const MENSAJES_SESIONES = {
     exito: 'Sesión agendada',
     sinBloques: 'Este entrenador no tiene horarios disponibles en los próximos 14 días',
     sinEntrenadores: 'Por ahora no hay entrenadores disponibles',
+    vacio: 'No tienes sesiones agendadas',
     aviso: (precio: string) =>
         `Se generará un cobro de $${precio} que puedes pagar en Mis pagos. Las sesiones no se pueden cancelar.`,
 } as const;
@@ -95,4 +97,40 @@ export function agruparPorDia(bloques: BloqueLibre[]): GrupoDia[] {
         else grupos.push({ dia, bloques: [bloque] });
     }
     return grupos;
+}
+
+export type EstadoCobroSesion = 'PENDIENTE' | 'PAGADO';
+
+/** Sesión tal como la devuelve GET /sesiones/mias. */
+export interface Sesion {
+    id: string;
+    inicio: string;
+    fin: string;
+    entrenador: string;
+    precio: string;
+    estado: 'AGENDADA';
+    asistencia: 'SIN_REGISTRAR' | 'ASISTIO' | 'NO_ASISTIO';
+    cobro: { id: string; estado: EstadoCobroSesion } | null;
+}
+
+/** Minutos entre el inicio y el fin de la sesión. */
+export function duracionMin(sesion: Pick<Sesion, 'inicio' | 'fin'>): number {
+    return Math.round((Date.parse(sesion.fin) - Date.parse(sesion.inicio)) / 60_000);
+}
+
+/**
+ * Próximas: las que todavía no terminan, de la más cercana a la más lejana.
+ * Pasadas: las que ya terminaron, de la más reciente a la más antigua.
+ */
+export function separarSesiones(
+    sesiones: Sesion[],
+    ahora: number = Date.now(),
+): { proximas: Sesion[]; pasadas: Sesion[] } {
+    const proximas = sesiones
+        .filter((s) => Date.parse(s.fin) > ahora)
+        .sort((a, b) => Date.parse(a.inicio) - Date.parse(b.inicio));
+    const pasadas = sesiones
+        .filter((s) => Date.parse(s.fin) <= ahora)
+        .sort((a, b) => Date.parse(b.inicio) - Date.parse(a.inicio));
+    return { proximas, pasadas };
 }

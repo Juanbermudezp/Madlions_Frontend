@@ -5,6 +5,7 @@ import type {
     BloquesEntrenador,
     Entrenador,
     Resultado,
+    Sesion,
     SesionAgendada,
 } from '@/lib/sesiones';
 
@@ -53,5 +54,14 @@ export async function agendarSesion(bloqueId: string): Promise<Resultado<SesionA
         };
     } catch (error) {
         return aError(error, 'Error al agendar la sesión:');
+    }
+}
+
+/** "Mis sesiones": las del miembro del token, con el estado de su cobro. */
+export async function listarMisSesiones(): Promise<Resultado<Sesion[]>> {
+    try {
+        return { ok: true, datos: await api<Sesion[]>('sesiones/mias') };
+    } catch (error) {
+        return aError(error, 'Error al consultar las sesiones:');
     }
 }
