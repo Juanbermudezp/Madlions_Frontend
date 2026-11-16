@@ -8,13 +8,13 @@ import {
   MENSAJES_PAGOS,
   fechaDePago,
   rutaComprobante,
-  rutaPagar,
   type Cobro,
   type EstadoCobro,
   type ResultadoCobros,
 } from '@/lib/pagos';
 import { formatearPrecio } from '@/lib/planes';
 import { botonPrimarioCss } from '@/components/clases/estilos';
+import { PagarCobro } from './pagar-cobro';
 
 const PESTANAS: { estado: EstadoCobro; etiqueta: string }[] = [
   { estado: 'PENDIENTE', etiqueta: 'Pendientes' },
@@ -28,6 +28,8 @@ export function MisPagos({ inicial }: { inicial: ResultadoCobros }) {
     PENDIENTE: inicial,
   });
   const [cargando, iniciar] = useTransition();
+  // Cobro que se está pagando (abre el checkout); null = cerrado.
+  const [pagando, setPagando] = useState<Cobro | null>(null);
   // Evita mostrar la respuesta de una pestaña vieja si el miembro cambió rápido.
   const ultima = useRef(0);
 
@@ -44,6 +46,12 @@ export function MisPagos({ inicial }: { inicial: ResultadoCobros }) {
     // Cada pestaña consulta la API con su estado al abrirse.
     setResultados((previos) => ({ ...previos, [estado]: undefined }));
     cargar(estado);
+  }
+
+  /** Tras una aprobación: el cobro sale de Pendientes y la pestaña Pagados se vuelve a consultar. */
+  function actualizarTrasPago() {
+    setResultados((previos) => ({ ...previos, PAGADO: undefined }));
+    cargar('PENDIENTE');
   }
 
   const resultado = resultados[pestana];
@@ -94,7 +102,7 @@ export function MisPagos({ inicial }: { inicial: ResultadoCobros }) {
           <ul className="flex flex-col gap-3">
             {resultado.cobros.map((cobro) =>
               pestana === 'PENDIENTE' ? (
-                <CobroPendiente key={cobro.id} cobro={cobro} />
+                <CobroPendiente key={cobro.id} cobro={cobro} onPagar={() => setPagando(cobro)} />
               ) : (
                 <CobroPagado key={cobro.id} cobro={cobro} />
               ),
@@ -102,11 +110,21 @@ export function MisPagos({ inicial }: { inicial: ResultadoCobros }) {
           </ul>
         )}
       </div>
+
+      {pagando && (
+        <PagarCobro
+          // key: cada apertura es un formulario nuevo; al cerrarlo se desmonta y sus datos desaparecen.
+          key={pagando.id}
+          cobro={pagando}
+          onCerrar={() => setPagando(null)}
+          onAprobado={actualizarTrasPago}
+        />
+      )}
     </div>
   );
 }
 
-function CobroPendiente({ cobro }: { cobro: Cobro }) {
+function CobroPendiente({ cobro, onPagar }: { cobro: Cobro; onPagar: () => void }) {
   return (
     <li className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
       <div className="min-w-0">
@@ -120,9 +138,9 @@ function CobroPendiente({ cobro }: { cobro: Cobro }) {
         )}
       </div>
       {cobro.habilitado ? (
-        <Link href={rutaPagar(cobro.id)} className={`${botonPrimarioCss} w-full text-center sm:w-auto`}>
+        <button type="button" onClick={onPagar} className={`${botonPrimarioCss} w-full sm:w-auto`}>
           Pagar
-        </Link>
+        </button>
       ) : (
         // Una renovación no habilitada no se puede iniciar: botón deshabilitado, sin enlace.
         <button type="button" disabled className={`${botonPrimarioCss} w-full cursor-not-allowed sm:w-auto`}>
