@@ -80,8 +80,8 @@ export function HistorialProgreso({ series, soloLectura = false, onEditar }: {
   </table></div>;
 }
 
-export function VistaEvolucion({ seriesExternas, soloLectura = false }: {
-  seriesExternas?: Serie[]; soloLectura?: boolean;
+export function VistaEvolucion({ seriesExternas, soloLectura = false, revisionRegistro = 0 }: {
+  seriesExternas?: Serie[]; soloLectura?: boolean; revisionRegistro?: number;
 }) {
   const [tipo, setTipo] = useState<TipoProgreso | "">("");
   const [desde, setDesde] = useState("");
@@ -111,7 +111,7 @@ export function VistaEvolucion({ seriesExternas, soloLectura = false }: {
       setCargando(false);
     }).catch(() => { if (vivo) { setError("No se pudo consultar el progreso."); setCargando(false); } });
     return () => { vivo = false; };
-  }, [filtro, version, seriesExternas]);
+  }, [filtro, version, seriesExternas, revisionRegistro]);
 
   const recargar = useCallback(() => {
     setCargando(true); setVersion((v) => v + 1);

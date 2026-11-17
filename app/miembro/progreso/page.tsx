@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
-import { FormularioRegistroProgreso } from "@/components/progreso/formulario-registro-progreso";
-import { VistaEvolucion } from "@/components/progreso/vista-evolucion";
+import { ProgresoMiembro } from "@/components/progreso/progreso-miembro";
 
 export const metadata: Metadata = { title: "Mi progreso | Madlions" };
 
@@ -13,8 +12,7 @@ export default function ProgresoPage() {
           Registra tu peso, medidas corporales y marcas de entrenamiento.
         </p>
       </div>
-      <FormularioRegistroProgreso />
-      <VistaEvolucion />
+      <ProgresoMiembro />
     </main>
   );
 }
