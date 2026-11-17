@@ -1,5 +1,7 @@
 import type { TipoProgreso } from "@/lib/progreso";
 
+export const SIN_PERMISO_PROGRESO = 'No tienes permiso para ver este recurso';
+
 export type Registro = { id: string; fecha: string; valor: number };
 export type Serie = {
   tipo: TipoProgreso;

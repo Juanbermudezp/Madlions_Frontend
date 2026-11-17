@@ -37,6 +37,7 @@ it('busca y selecciona miembros con el contrato limitado de entrenador', async (
 it('muestra rutinas y precarga días/ejercicios en orden con miembro fijo', () => {
   render(<Rutinas inicial={{ ok: true, datos: [rutina] }} />);
   expect(screen.getByRole('heading', { name: rutina.nombre })).toBeTruthy();
+  expect(screen.getByRole('link', { name: 'Ver progreso' }).getAttribute('href')).toBe(`/entrenador/miembros/${rutina.miembroId}/progreso`);
   fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
   expect((screen.getByLabelText('Nombre de rutina') as HTMLInputElement).value).toBe(rutina.nombre);
   expect((screen.getByLabelText('Nombre del ejercicio') as HTMLInputElement).value).toBe('Press banca');

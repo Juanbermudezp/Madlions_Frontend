@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState, useTransition } from 'react';
+import Link from 'next/link';
 import { listarRutinas } from '@/app/actions/rutinas';
 import { formatearFecha } from '@/lib/membresias';
 import type { MiembroRutina, ResultadoRutina, Rutina } from '@/lib/rutinas';
@@ -59,6 +60,7 @@ export function Rutinas({ inicial }: { inicial: ResultadoRutina<Rutina[]> }) {
           <p className="text-sm">{rutina.miembro.nombre} {rutina.miembro.apellido} · {rutina.miembro.codigo}</p>
           <p className="text-xs text-zinc-500">Inicio: {formatearFecha(rutina.fechaInicio)}</p>
           <button type="button" disabled={ocupado} className={botonSecundarioCss} onClick={() => { setEditando(rutina); setMiembro(rutina.miembro); setMensaje(''); setSesionEditor((s) => s + 1); }}>Editar</button>
+          <Link href={`/entrenador/miembros/${rutina.miembroId}/progreso`} className="ml-3 inline-block text-sm underline">Ver progreso</Link>
         </li>)}</ul>
         {lista.length > 20 && <nav aria-label="Páginas de rutinas" className="flex flex-wrap items-center gap-2 text-sm">
           <button type="button" className={botonSecundarioCss} disabled={ocupado || pagina === 1} onClick={() => setPagina((p) => p - 1)}>Anterior</button>
