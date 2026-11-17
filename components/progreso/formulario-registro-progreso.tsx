@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
 import { registrarProgreso } from "@/app/actions/progreso";
 import type { MedicionProgreso, TipoProgreso } from "@/lib/progreso";
 
@@ -60,8 +59,7 @@ function parsearDecimal(valor: string, minimo: number, maximo: number): number |
     : null;
 }
 
-export function FormularioRegistroProgreso() {
-  const router = useRouter();
+export function FormularioRegistroProgreso({ onRegistrado }: { onRegistrado: () => void }) {
   const siguienteId = useRef(1);
   const [abierto, setAbierto] = useState(false);
   const [fecha, setFecha] = useState("");
@@ -169,7 +167,7 @@ export function FormularioRegistroProgreso() {
       limpiarFormulario();
       setAbierto(false);
       setExito("Progreso registrado");
-      router.refresh();
+      onRegistrado();
     } catch {
       setError("No se pudo registrar el progreso. Intenta nuevamente.");
     } finally {
