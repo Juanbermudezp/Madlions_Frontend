@@ -11,20 +11,17 @@ import {
     MENSAJES_ACCESO,
     REFRESCO_MS,
     horaLocal,
+    hoyLocal,
     type AccesoDelDia,
     type EstadoAcceso,
 } from '@/lib/accesos';
-import {
-    COLOR_ESTADO_MEMBRESIA,
-    ETIQUETA_ESTADO_MEMBRESIA,
-    SIN_RESULTADOS,
-    type MiembroEncontrado,
-} from '@/lib/membresias';
+import { SIN_RESULTADOS, type MiembroEncontrado } from '@/lib/membresias';
+import { ResultadoMiembro } from './resultado-miembro';
 
 /**
- * FE-10.1 · Control de acceso de recepción: buscador de miembros con su
- * estado de membresía (H11), botones de ingreso y salida, y la lista del día
- * que se refresca cada 30 segundos o con "Actualizar".
+ * FE-10.1 y FE-11.1 · Control de acceso de recepción: buscador de miembros
+ * con la alerta de su membresía, ingreso normal o con excepción, salida y la
+ * lista del día que se refresca cada 30 segundos o con "Actualizar".
  */
 export function ControlAcceso({ inicial }: { inicial: AccesoDelDia[] }) {
     const [accesos, setAccesos] = useState(inicial);
@@ -58,6 +55,7 @@ export function ControlAcceso({ inicial }: { inicial: AccesoDelDia[] }) {
     const dentroPorCodigo = new Map(
         accesos.filter((a) => a.estado === 'DENTRO').map((a) => [a.miembro.codigo, a.id]),
     );
+    const hoy = hoyLocal();
 
     function buscar(evento: React.FormEvent) {
         evento.preventDefault();
@@ -85,8 +83,12 @@ export function ControlAcceso({ inicial }: { inicial: AccesoDelDia[] }) {
         });
     }
 
-    const ingreso = (miembroId: string) =>
-        enviar(miembroId, () => registrarIngreso(miembroId), MENSAJES_ACCESO.ingreso);
+    const ingreso = (miembroId: string, motivoExcepcion?: string) =>
+        enviar(
+            miembroId,
+            () => registrarIngreso(miembroId, motivoExcepcion),
+            motivoExcepcion ? MENSAJES_ACCESO.ingresoExcepcion : MENSAJES_ACCESO.ingreso,
+        );
     const salida = (registroId: string) =>
         enviar(registroId, () => registrarSalida(registroId), MENSAJES_ACCESO.salida);
 
@@ -133,43 +135,16 @@ export function ControlAcceso({ inicial }: { inicial: AccesoDelDia[] }) {
                         {resultados.map((miembro) => {
                             const registroDentro = dentroPorCodigo.get(miembro.codigo);
                             return (
-                                <li
-                                    key={miembro.id}
-                                    className="flex flex-col gap-3 rounded-lg border border-zinc-200 p-3 sm:flex-row sm:items-center sm:justify-between dark:border-zinc-800"
-                                >
-                                    <div className="min-w-0">
-                                        <p className="font-medium">
-                                            {miembro.nombre} {miembro.apellido}
-                                        </p>
-                                        <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                                            {miembro.codigo} · {miembro.documento}
-                                        </p>
-                                        <span
-                                            className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${COLOR_ESTADO_MEMBRESIA[miembro.estadoMembresia]}`}
-                                        >
-                                            {ETIQUETA_ESTADO_MEMBRESIA[miembro.estadoMembresia]}
-                                        </span>
-                                    </div>
-                                    {registroDentro ? (
-                                        <button
-                                            type="button"
-                                            onClick={() => salida(registroDentro)}
-                                            disabled={ocupado}
-                                            className={botonSecundarioCss}
-                                        >
-                                            {enviando === registroDentro ? 'Registrando…' : 'Registrar salida'}
-                                        </button>
-                                    ) : (
-                                        <button
-                                            type="button"
-                                            onClick={() => ingreso(miembro.id)}
-                                            disabled={ocupado}
-                                            className={botonPrimarioCss}
-                                        >
-                                            {enviando === miembro.id ? 'Registrando…' : 'Registrar ingreso'}
-                                        </button>
-                                    )}
-                                </li>
+                                <ResultadoMiembro
+                                    // La clave cambia al entrar o salir: así el campo de motivo se reinicia.
+                                    key={`${miembro.id}-${registroDentro ?? 'fuera'}`}
+                                    miembro={miembro}
+                                    registroDentro={registroDentro}
+                                    hoy={hoy}
+                                    enviando={enviando}
+                                    onIngreso={ingreso}
+                                    onSalida={salida}
+                                />
                             );
                         })}
                     </ul>
@@ -217,12 +192,7 @@ export function ControlAcceso({ inicial }: { inicial: AccesoDelDia[] }) {
                                             </td>
                                             <td className="px-3 py-2 text-right">
                                                 {a.estado === 'DENTRO' && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => salida(a.id)}
-                                                        disabled={ocupado}
-                                                        className={botonSecundarioCss}
-                                                    >
+                                                    <button type="button" onClick={() => salida(a.id)} disabled={ocupado} className={botonSecundarioCss}>
                                                         {enviando === a.id ? 'Registrando…' : 'Registrar salida'}
                                                     </button>
                                                 )}
@@ -248,12 +218,7 @@ export function ControlAcceso({ inicial }: { inicial: AccesoDelDia[] }) {
                                         Ingreso {horaLocal(a.ingresoEn)} · Salida {a.salidaEn ? horaLocal(a.salidaEn) : '—'}
                                     </p>
                                     {a.estado === 'DENTRO' && (
-                                        <button
-                                            type="button"
-                                            onClick={() => salida(a.id)}
-                                            disabled={ocupado}
-                                            className={botonSecundarioCss}
-                                        >
+                                        <button type="button" onClick={() => salida(a.id)} disabled={ocupado} className={botonSecundarioCss}>
                                             {enviando === a.id ? 'Registrando…' : 'Registrar salida'}
                                         </button>
                                     )}
