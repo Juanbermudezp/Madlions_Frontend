@@ -1,6 +1,6 @@
 "use server";
 
-import { getSession } from "@/lib/session";
+import { obtenerToken } from "@/lib/session";
 import type { Filtro, Resultado, Serie } from "@/lib/evolucion";
 
 function baseApi(): string | null {
@@ -21,7 +21,7 @@ async function obtenerError(res: Response): Promise<string> {
 }
 
 export async function consultarEvolucion(filtro: Filtro = {}): Promise<Resultado<Serie[]>> {
-  const token = await getSession();
+  const token = await obtenerToken();
   if (!token) return { ok: false, error: "Inicia sesión para consultar tu progreso.", status: 401 };
   const base = baseApi();
   if (!base) return { ok: false, error: "Falta configurar API_URL." };
@@ -47,7 +47,7 @@ export async function consultarEvolucion(filtro: Filtro = {}): Promise<Resultado
 export async function editarProgreso(id: string, cambios: {
   fecha: string; valor: number; ejercicio?: string; repeticiones?: number;
 }): Promise<Resultado<null>> {
-  const token = await getSession();
+  const token = await obtenerToken();
   if (!token) return { ok: false, error: "Tu sesión expiró.", status: 401 };
   const base = baseApi();
   if (!base) return { ok: false, error: "Falta configurar API_URL." };

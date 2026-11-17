@@ -1,6 +1,6 @@
 "use server";
 
-import { getSession } from "@/lib/session";
+import { obtenerToken } from "@/lib/session";
 import type { CrearProgreso, ResultadoRegistro } from "@/lib/progreso";
 
 /**
@@ -10,7 +10,7 @@ import type { CrearProgreso, ResultadoRegistro } from "@/lib/progreso";
 export async function registrarProgreso(
   datos: CrearProgreso,
 ): Promise<ResultadoRegistro> {
-  const token = await getSession();
+  const token = await obtenerToken();
   if (!token) {
     return { ok: false, error: "Tu sesión ha expirado. Inicia sesión nuevamente.", status: 401 };
   }
