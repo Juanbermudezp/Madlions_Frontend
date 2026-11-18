@@ -13,8 +13,8 @@ beforeEach(() => {
   vi.mocked(listarRutinas).mockResolvedValue({ ok: true, datos: [rutina] });
 });
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
-async function elegir() {
-  fireEvent.change(screen.getByLabelText('Nombre o código del miembro'), { target: { value: 'Ana' } });
+async function elegir(texto = 'Ana') {
+  fireEvent.change(screen.getByLabelText('Nombre o código del miembro'), { target: { value: texto } });
   fireEvent.click(screen.getByRole('button', { name: 'Buscar' }));
   fireEvent.click(await screen.findByRole('button', { name: 'Ana Paz · MBR-000001' }));
 }
@@ -88,7 +88,7 @@ it('impide guardar sin días o sin ejercicios y conserva errores accesibles', as
   fireEvent.click(screen.getByRole('button', { name: 'Guardar' }));
   expect(screen.getByText('Agrega entre 1 y 7 días.')).toBeTruthy();
 });
-it.each([['Series', '0'], ['Repeticiones', '0'], ['Descanso (segundos)', '-1'], ['Descanso (segundos)', ''], ['Series', '2.5']])('marca el error junto a %s con valor %s', async (etiqueta, valor) => {
+it.each([['Series', '0'], ['Repeticiones', '0'], ['Descanso (segundos)', '-5'], ['Descanso (segundos)', ''], ['Series', '2.5']])('marca el error junto a %s con valor %s', async (etiqueta, valor) => {
   render(<Rutinas inicial={{ ok: true, datos: [] }} />); await elegir(); llenar();
   const input = screen.getByLabelText(etiqueta);
   fireEvent.change(input, { target: { value: valor } });
@@ -167,4 +167,56 @@ it('pagina listas largas de veinte en veinte sin modificar el contrato de la API
   fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
   expect(screen.getAllByRole('button', { name: 'Editar' })).toHaveLength(1);
   expect(screen.getByRole('heading', { name: 'Rutina 21' })).toBeTruthy();
+});
+
+it('QA-H14-01 busca por código y envía tres días con varios ejercicios cada uno', async () => {
+  render(<Rutinas inicial={{ ok: true, datos: [] }} />);
+  await elegir(miembro.codigo);
+  expect(buscarMiembrosRutina).toHaveBeenCalledWith(miembro.codigo);
+  fireEvent.click(screen.getByRole('button', { name: 'Agregar día' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Agregar día' }));
+  for (const agregar of screen.getAllByRole('button', { name: 'Agregar ejercicio' })) fireEvent.click(agregar);
+  llenar(); fireEvent.click(screen.getByRole('button', { name: 'Guardar' }));
+  await screen.findByText('Rutina asignada');
+  const [id, payload] = vi.mocked(crearRutina).mock.calls[0];
+  expect(id).toBe(miembro.id); expect(payload.dias).toHaveLength(3);
+  expect(payload.dias.every((d) => d.ejercicios.length === 2)).toBe(true);
+});
+
+it('QA-H14-04 permite editar ejercicios y añadir distribución enviando lista completa sin IDs', async () => {
+  render(<Rutinas inicial={{ ok: true, datos: [rutina] }} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
+  fireEvent.change(screen.getByLabelText('Nombre del ejercicio'), { target: { value: 'Peso muerto' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Agregar día' }));
+  fireEvent.change(screen.getByLabelText('Nombre del día 2'), { target: { value: 'Piernas' } });
+  fireEvent.change(screen.getAllByLabelText('Nombre del ejercicio')[1], { target: { value: 'Sentadilla' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar' }));
+  await screen.findByText('Rutina actualizada');
+  const [id, payload] = vi.mocked(actualizarRutina).mock.calls[0];
+  expect(id).toBe(rutina.id); expect(payload.dias).toHaveLength(2);
+  expect(payload.dias[0].ejercicios[0].nombre).toBe('Peso muerto');
+  expect(payload.dias[1].nombre).toBe('Piernas');
+  expect(payload.dias[1].ejercicios[0].nombre).toBe('Sentadilla');
+  expect(payload).not.toHaveProperty('miembroId');
+  expect(payload.dias[0]).not.toHaveProperty('id');
+});
+
+it.each(['ab', 'x'.repeat(61)])('QA-H14-05 señala nombre inválido junto al campo (%s)', async (nombre) => {
+  render(<Rutinas inicial={{ ok: true, datos: [] }} />); await elegir(); llenar();
+  const campo = screen.getByLabelText('Nombre de rutina');
+  fireEvent.change(campo, { target: { value: nombre } });
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar' }));
+  expect(campo.getAttribute('aria-invalid')).toBe('true');
+  expect(document.getElementById(campo.getAttribute('aria-describedby')!)?.textContent).toContain('3 y 60');
+  expect(crearRutina).not.toHaveBeenCalled();
+});
+
+it('QA-H14-05 muestra error de fecha pasada al crear sin invocar la acción', async () => {
+  render(<Rutinas inicial={{ ok: true, datos: [] }} />); await elegir(); llenar();
+  const campo = screen.getByLabelText('Fecha de inicio');
+  fireEvent.change(campo, { target: { value: '2000-01-01' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar' }));
+  expect(campo.getAttribute('aria-invalid')).toBe('true');
+  expect(document.getElementById(campo.getAttribute('aria-describedby')!)?.textContent).toContain('hoy o posterior');
+  expect(crearRutina).not.toHaveBeenCalled();
 });
