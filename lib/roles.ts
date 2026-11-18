@@ -58,8 +58,8 @@ export interface OpcionMenu {
 export const MENU_POR_ROL: Record<Rol, OpcionMenu[]> = {
   MIEMBRO: [
     { etiqueta: 'Mi membresía', href: '/miembro/membresia', historia: 'H3' },
-    { etiqueta: 'Agenda de clases', href: '/miembro/clases', historia: 'H5' },
-    { etiqueta: 'Mis reservas', href: '/miembro/reservas', historia: 'H6' },
+    { etiqueta: 'Clases de la semana', href: '/miembro/clases', historia: 'H5' },
+    { etiqueta: 'Mis reservas', href: '/miembro/reservas', historia: 'H5' },
     { etiqueta: 'Sesiones personales', href: '/miembro/sesiones', historia: 'H9' },
     { etiqueta: 'Mis rutinas', href: '/miembro/rutinas', historia: 'H15' },
     { etiqueta: 'Mi progreso', href: '/miembro/progreso', historia: 'H16' },
