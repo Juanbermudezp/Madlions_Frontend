@@ -1,12 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import Link from 'next/link';
 import { consultarEvolucion, editarProgreso } from "@/app/actions/evolucion";
+import { consultarProgresoMiembro } from '@/app/actions/progreso-entrenador';
+import { SIN_PERMISO_PROGRESO } from '@/lib/evolucion';
 import type { Filtro, Registro, Serie } from "@/lib/evolucion";
 import type { TipoProgreso } from "@/lib/progreso";
 
 const TIPOS: TipoProgreso[] = ["PESO", "CINTURA", "CADERA", "PECHO", "BRAZO", "MUSLO", "MARCA"];
-const inputCss = "w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900";
+const inputCss = "min-w-0 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900";
 const label: Record<TipoProgreso, string> = {
   PESO: "Peso corporal", CINTURA: "Cintura", CADERA: "Cadera",
   PECHO: "Pecho", BRAZO: "Brazo", MUSLO: "Muslo", MARCA: "Marca",
@@ -70,19 +73,35 @@ export function HistorialProgreso({ series, soloLectura = false, onEditar }: {
 }) {
   const filas = series.flatMap((serie) => serie.registros.map((registro) => ({ serie, registro })))
     .sort((a, b) => b.registro.fecha.localeCompare(a.registro.fecha) || titulo(a.serie).localeCompare(titulo(b.serie)));
-  return <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800"><table className="w-full text-left text-sm">
-    <thead className="bg-zinc-100 dark:bg-zinc-900"><tr><th className="p-3">Fecha</th><th className="p-3">Medición</th><th className="p-3">Valor</th>{!soloLectura && onEditar && <th className="p-3">Acción</th>}</tr></thead>
+  const celda = soloLectura ? 'break-words p-2' : 'p-3';
+  return <div className="min-w-0 overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800"><table className={soloLectura ? 'w-full table-fixed text-left text-xs sm:text-sm' : 'w-full text-left text-sm'}>
+    <thead className="bg-zinc-100 dark:bg-zinc-900"><tr><th className={`${celda} ${soloLectura ? 'w-[30%]' : ''}`}>Fecha</th><th className={celda}>Medición</th><th className={`${celda} ${soloLectura ? 'w-[26%]' : ''}`}>Valor</th>{!soloLectura && onEditar && <th className="p-3">Acción</th>}</tr></thead>
     <tbody>{filas.map((f) => <tr key={f.registro.id} className="border-t border-zinc-200 dark:border-zinc-800">
-      <td className="whitespace-nowrap p-3">{fechaEs(f.registro.fecha)}</td><td className="p-3">{titulo(f.serie)}</td>
-      <td className="whitespace-nowrap p-3">{decimal(f.registro.valor)} {unidad(f.serie.tipo)}</td>
+      <td className={soloLectura ? celda : 'whitespace-nowrap p-3'}>{fechaEs(f.registro.fecha)}</td><td className={celda}>{titulo(f.serie)}</td>
+      <td className={soloLectura ? celda : 'whitespace-nowrap p-3'}>{decimal(f.registro.valor)} {unidad(f.serie.tipo)}</td>
       {!soloLectura && onEditar && <td className="p-3"><button type="button" className="text-sky-700 underline dark:text-sky-400" onClick={() => onEditar(f)}>Editar</button></td>}
     </tr>)}</tbody>
   </table></div>;
 }
 
-export function VistaEvolucion({ seriesExternas, soloLectura = false, revisionRegistro = 0 }: {
-  seriesExternas?: Serie[]; soloLectura?: boolean; revisionRegistro?: number;
-}) {
+type PropsVistaEvolucion = {
+  seriesExternas?: Serie[]; soloLectura?: boolean;
+  revisionRegistro?: number;
+  consulta?: { modo: 'entrenador'; miembroId: string };
+};
+
+export function VistaEvolucion(props: PropsVistaEvolucion) {
+  // El cambio de identidad reinicia el estado antes de renderizar, no después
+  // del efecto: nunca aparece progreso de otro miembro durante la navegación.
+  return <ContenidoEvolucion key={props.consulta ? `entrenador:${props.consulta.miembroId}` : 'miembro'} {...props} />;
+}
+
+function ContenidoEvolucion({ seriesExternas: externasRecibidas, soloLectura: lecturaSolicitada = false, consulta, revisionRegistro = 0 }: PropsVistaEvolucion) {
+  const entrenador = consulta?.modo === 'entrenador';
+  const miembroId = consulta?.miembroId;
+  const soloLectura = entrenador || lecturaSolicitada;
+  // En modo entrenador no se aceptan series que eludan su consulta autorizada.
+  const seriesExternas = entrenador ? undefined : externasRecibidas;
   const [tipo, setTipo] = useState<TipoProgreso | "">("");
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
@@ -91,6 +110,7 @@ export function VistaEvolucion({ seriesExternas, soloLectura = false, revisionRe
   const [seriesCargadas, setSeriesCargadas] = useState<Serie[]>([]);
   const [cargando, setCargando] = useState(!seriesExternas);
   const [error, setError] = useState("");
+  const [estadoError, setEstadoError] = useState<number | undefined>();
   const [seleccion, setSeleccion] = useState("");
   const [edicion, setEdicion] = useState<Fila | null>(null);
   const [fechaEditar, setFechaEditar] = useState("");
@@ -104,14 +124,15 @@ export function VistaEvolucion({ seriesExternas, soloLectura = false, revisionRe
   useEffect(() => {
     if (seriesExternas) return;
     let vivo = true;
-    consultarEvolucion(filtro).then((r) => {
+    const peticion = entrenador ? consultarProgresoMiembro(miembroId ?? '', filtro) : consultarEvolucion(filtro);
+    peticion.then((r) => {
       if (!vivo) return;
-      if (r.ok) { setSeriesCargadas(r.data); setError(""); }
-      else setError(r.error);
+      if (r.ok) { setSeriesCargadas(r.data); setError(""); setEstadoError(undefined); }
+      else { setSeriesCargadas([]); setError(entrenador && r.status === 403 ? SIN_PERMISO_PROGRESO : r.error); setEstadoError(r.status); }
       setCargando(false);
-    }).catch(() => { if (vivo) { setError("No se pudo consultar el progreso."); setCargando(false); } });
+    }).catch(() => { if (vivo) { setSeriesCargadas([]); setError(entrenador ? 'No se pudo conectar con el servidor. Intenta de nuevo.' : "No se pudo consultar el progreso."); setEstadoError(undefined); setCargando(false); } });
     return () => { vivo = false; };
-  }, [filtro, version, seriesExternas, revisionRegistro]);
+  }, [filtro, version, seriesExternas, entrenador, miembroId, revisionRegistro]);
 
   const recargar = useCallback(() => {
     setCargando(true); setVersion((v) => v + 1);
@@ -126,12 +147,13 @@ export function VistaEvolucion({ seriesExternas, soloLectura = false, revisionRe
     setFiltro({ ...(tipo ? { tipo } : {}), ...(desde ? { desde } : {}), ...(hasta ? { hasta } : {}) });
   }
   function abrirEdicion(f: Fila) {
+    if (soloLectura) return;
     setEdicion(f); setFechaEditar(f.registro.fecha); setValorEditar(String(f.registro.valor));
     setEjercicioEditar(f.serie.ejercicio ?? ""); setRepsEditar(String(f.serie.repeticiones ?? "")); setErrorEdicion("");
   }
   async function guardarEdicion(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!edicion || guardando) return;
+    if (soloLectura || !edicion || guardando) return;
     const tipo = edicion.serie.tipo;
     const esMarca = tipo === "MARCA";
     const min = esMarca ? 0.5 : tipo === "PESO" ? 20 : 10;
@@ -152,8 +174,8 @@ export function VistaEvolucion({ seriesExternas, soloLectura = false, revisionRe
     setEdicion(null); setSeleccion(""); setExito("Medición actualizada"); recargar();
   }
 
-  return <section className="mt-6 space-y-5 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950 sm:p-6">
-    <div className="flex items-center justify-between gap-3"><div><h2 className="text-xl font-semibold">Evolución de mi progreso</h2><p className="text-sm text-zinc-500">Compara tus registros con el punto de partida.</p></div>
+  return <section className="mt-6 min-w-0 space-y-5 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950 sm:p-6">
+    <div className="flex flex-wrap items-center justify-between gap-3"><div className="min-w-0"><h2 className="text-xl font-semibold">{entrenador ? 'Evolución del miembro' : 'Evolución de mi progreso'}</h2><p className="text-sm text-zinc-500">{entrenador ? 'Consulta sus registros y su punto de partida.' : 'Compara tus registros con el punto de partida.'}</p></div>
       {!seriesExternas && <button type="button" className="rounded-lg border px-3 py-2 text-sm disabled:opacity-50" disabled={cargando} onClick={recargar}>Actualizar</button>}
     </div>
     {!seriesExternas && <form onSubmit={filtrar} className="grid grid-cols-1 items-end gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -163,9 +185,11 @@ export function VistaEvolucion({ seriesExternas, soloLectura = false, revisionRe
       <button type="submit" disabled={cargando} className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 dark:bg-white dark:text-zinc-900">Aplicar filtros</button>
     </form>}
     {exito && <p role="status" className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">{exito}</p>}
-    {cargando && <p role="status" className="py-6 text-center text-sm text-zinc-500">Cargando progreso...</p>}
-    {!cargando && error && <div role="alert" className="rounded-lg bg-red-50 p-4 text-sm text-red-800 dark:bg-red-950 dark:text-red-200">{error}<button type="button" className="ml-3 underline" onClick={recargar}>Reintentar</button></div>}
-    {!cargando && !error && !series.length && <p className="rounded-lg bg-zinc-100 p-6 text-center text-sm dark:bg-zinc-900">Aún no registras tu progreso. Agrega tu primera medición para ver tu evolución.</p>}
+    {cargando && <p role="status" className="py-6 text-center text-sm text-zinc-500">{entrenador ? 'Cargando progreso del miembro…' : 'Cargando progreso...'}</p>}
+    {!cargando && error && <div role="alert" className="break-words rounded-lg bg-red-50 p-4 text-sm text-red-800 dark:bg-red-950 dark:text-red-200"><p>{error}</p>
+      {entrenador && estadoError === 401 ? <Link href="/login" className="mt-2 inline-block underline">Iniciar sesión</Link> : <button type="button" className="mt-2 underline" onClick={recargar}>Reintentar</button>}
+    </div>}
+    {!cargando && !error && !series.length && <p className="rounded-lg bg-zinc-100 p-6 text-center text-sm dark:bg-zinc-900">{entrenador ? 'El miembro no tiene registros de progreso para los filtros seleccionados.' : 'Aún no registras tu progreso. Agrega tu primera medición para ver tu evolución.'}</p>}
     {!cargando && !error && actual && <>
       <label className="block max-w-md space-y-1 text-sm">Medición para comparar<select className={inputCss} value={clave(actual)} onChange={(e) => setSeleccion(e.target.value)}>{series.map((s) => <option key={clave(s)} value={clave(s)}>{titulo(s)}</option>)}</select></label>
       <ResumenProgreso serie={actual} /><GraficaProgreso serie={actual} />
