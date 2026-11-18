@@ -11,6 +11,7 @@ import {
   type Maquina,
   type ResumenMaquinas,
 } from '@/lib/maquinas';
+import Link from 'next/link';
 import { FiltrosEquipo } from './filtros-equipo';
 
 // FE-17.1: vista del inventario de máquinas.
@@ -20,11 +21,14 @@ export function InventarioEquipo({
   maquinas,
   filtros,
   rutaBase,
+  conDetalle,
 }: {
   resumen: ResumenMaquinas;
   maquinas: Maquina[];
   filtros: FiltrosMaquina;
   rutaBase: string;
+  /** H18: solo el administrador y el entrenador abren el detalle. */
+  conDetalle: boolean;
 }) {
   const conFiltros = hayFiltros(filtros);
 
@@ -71,7 +75,11 @@ export function InventarioEquipo({
 
           <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
             {maquinas.map((maquina) => (
-              <TarjetaMaquina key={maquina.id} maquina={maquina} />
+              <TarjetaMaquina
+                key={maquina.id}
+                maquina={maquina}
+                href={conDetalle ? `${rutaBase}/${maquina.id}` : null}
+              />
             ))}
           </ul>
         </div>
@@ -80,17 +88,32 @@ export function InventarioEquipo({
   );
 }
 
-function TarjetaMaquina({ maquina }: { maquina: Maquina }) {
+// `href` nulo para el miembro y recepción: su tarjeta no es clicable (H18).
+function TarjetaMaquina({ maquina, href }: { maquina: Maquina; href: string | null }) {
   const color = COLOR_ESTADO_MAQUINA[maquina.estado];
   const hayCambio = Boolean(maquina.ultimoMotivo ?? maquina.ultimoCambioPor);
 
   return (
     <li
-      className={`flex flex-col rounded-lg border border-l-4 border-zinc-200 p-4 dark:border-zinc-800 ${color.borde}`}
+      className={`relative flex flex-col rounded-lg border border-l-4 border-zinc-200 p-4 dark:border-zinc-800 ${color.borde} ${
+        href ? 'transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-900' : ''
+      }`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="font-medium break-words">{maquina.nombre}</h2>
+          <h2 className="font-medium break-words">
+            {/* El enlace del nombre se estira sobre toda la tarjeta. */}
+            {href ? (
+              <Link
+                href={href}
+                className="after:absolute after:inset-0 after:rounded-lg hover:underline"
+              >
+                {maquina.nombre}
+              </Link>
+            ) : (
+              maquina.nombre
+            )}
+          </h2>
           <p className="mt-0.5 font-mono text-xs text-zinc-500">{maquina.codigo}</p>
         </div>
 
