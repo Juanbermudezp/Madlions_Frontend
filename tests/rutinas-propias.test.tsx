@@ -139,6 +139,39 @@ it('cambiar de UUID elimina el detalle anterior y descarta su respuesta tardía'
   expect(screen.queryByRole('article')).toBeNull();
   expect(consultarMiRutina).toHaveBeenLastCalledWith(otraRutinaPropia.id);
 });
+it('QA-H15-02/05: navegar entre dos detalles cargados retira A antes de consultar y mostrar B', async () => {
+  const vista = render(<DetalleRutina id={rutinaPropia.id} />);
+  await screen.findByRole('article', { name: 'Press banca' });
+  let resolver!: (r: ResultadoRutinaPropia<RutinaPropiaDetalle>) => void;
+  vi.mocked(consultarMiRutina).mockReturnValueOnce(new Promise((r) => { resolver = r; }));
+  vista.rerender(<DetalleRutina id={otraRutinaPropia.id} />);
+  expect(screen.queryByText(rutinaPropia.nombre)).toBeNull();
+  expect(screen.queryByRole('article')).toBeNull();
+  expect(screen.getByRole('status').textContent).toBe('Cargando rutina…');
+  const segunda = { ...detallePropio, ...otraRutinaPropia, dias: [{ ...detallePropio.dias[0],
+    ejercicios: [{ ...detallePropio.dias[0].ejercicios[0], nombre: 'Movilidad de cadera' }] }] };
+  await act(async () => resolver({ ok: true, datos: segunda }));
+  expect(screen.getByRole('heading', { name: otraRutinaPropia.nombre })).toBeTruthy();
+  expect(screen.getByRole('article', { name: 'Movilidad de cadera' })).toBeTruthy();
+  expect(screen.queryByText('Press banca')).toBeNull();
+  expect(screen.queryByText(rutinaPropia.nombre)).toBeNull();
+  expect(consultarMiRutina).toHaveBeenLastCalledWith(otraRutinaPropia.id);
+});
+it('QA-H15-05: respuesta tardía de una actualización no restaura datos después de un 403 más reciente', async () => {
+  render(<DetalleRutina id={rutinaPropia.id} />);
+  await screen.findByRole('article', { name: 'Press banca' });
+  let resolver!: (r: ResultadoRutinaPropia<RutinaPropiaDetalle>) => void;
+  vi.mocked(consultarMiRutina).mockReturnValueOnce(new Promise((r) => { resolver = r; }))
+    .mockResolvedValueOnce({ ok: false, status: 403, error: 'Acceso denegado.' });
+  fireEvent.click(screen.getByRole('button', { name: 'Actualizar' }));
+  fireEvent.focus(window);
+  await screen.findByText('Acceso denegado.');
+  await act(async () => resolver({ ok: true, datos: detallePropio }));
+  expect(screen.getByRole('alert').textContent).toContain('Acceso denegado.');
+  expect(screen.queryByRole('article')).toBeNull();
+  expect(screen.queryByText(rutinaPropia.nombre)).toBeNull();
+  expect(consultarMiRutina).toHaveBeenCalledTimes(3);
+});
 it('al volver a montar la lista consulta de nuevo y no restaura tarjetas anteriores', async () => {
   const vista = render(<MisRutinas />);
   await screen.findByRole('heading', { name: rutinaPropia.nombre });
