@@ -1,7 +1,9 @@
 import { redirect } from 'next/navigation';
 import { api, SesionInvalidaError } from '@/lib/api';
+import { obtenerUsuario } from '@/lib/dal';
 import {
   consultaMaquinas,
+  puedeGestionarMaquinas,
   type FiltrosMaquina,
   type InventarioMaquinas,
 } from '@/lib/maquinas';
@@ -19,6 +21,9 @@ export async function PaginaEquipo({
   let inventario: InventarioMaquinas | null = null;
   let error = '';
   let sesionVencida = false;
+
+  // El usuario ya viene del caché de la petición: lo pidió el Shell.
+  const usuario = await obtenerUsuario();
 
   try {
     inventario = await api<InventarioMaquinas>(`maquinas${consultaMaquinas(filtros)}`);
@@ -38,6 +43,7 @@ export async function PaginaEquipo({
       maquinas={inventario.maquinas}
       filtros={filtros}
       rutaBase={rutaBase}
+      conDetalle={usuario !== null && puedeGestionarMaquinas(usuario.rol)}
     />
   );
 }
