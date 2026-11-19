@@ -27,11 +27,17 @@ export async function listarAccesosHoy(): Promise<Resultado<AccesoDelDia[]>> {
     }
 }
 
-export async function registrarIngreso(miembroId: string): Promise<Resultado<{ id: string }>> {
+export async function registrarIngreso(
+    miembroId: string,
+    motivoExcepcion?: string,
+): Promise<Resultado<{ id: string }>> {
     try {
         return {
             ok: true,
-            datos: await api<{ id: string }>('accesos/ingreso', { method: 'POST', body: { miembroId } }),
+            datos: await api<{ id: string }>('accesos/ingreso', {
+                method: 'POST',
+                body: motivoExcepcion ? { miembroId, motivoExcepcion } : { miembroId },
+            }),
         };
     } catch (error) {
         return aError(error, 'Error al registrar el ingreso:');
