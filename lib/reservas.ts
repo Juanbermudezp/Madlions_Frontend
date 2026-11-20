@@ -3,7 +3,7 @@
  * Se usan en el servidor y en el navegador: no importan nada del servidor de Next.
  */
 
-import { fechaLocal, hoyLocal, lunesDe, sumarDias, type EstadoClaseVisible } from './clases';
+import { fechaLocal, horaLocal, hoyLocal, lunesDe, sumarDias, type EstadoClaseVisible } from './clases';
 
 /** Las dos semanas que el miembro puede consultar (BE-5.1). */
 export type SemanaReservable = 'actual' | 'siguiente';
@@ -47,6 +47,7 @@ export type ResultadoLista<T> = { ok: true; datos: T[] } | { ok: false; error: s
 export type ResultadoReserva =
   | { ok: true; id: string; lugaresDisponibles: number }
   | { ok: false; error: string };
+export type ResultadoCancelacion = { ok: true; lugaresDisponibles: number } | { ok: false; error: string };
 
 export const ETIQUETA_ESTADO_RESERVA: Record<EstadoReserva, string> = {
   CONFIRMADA: 'Confirmada',
@@ -67,6 +68,7 @@ export const MENSAJES_RESERVAS = {
   confirmada: 'Reserva confirmada',
   llena: 'Llena',
   reservada: 'Reservada',
+  cancelada: 'Reserva cancelada',
 } as const;
 
 /** Partes de una fecha (AAAA-MM-DD) para el bloque de fecha de las tarjetas: "jue", "19", "nov". */
@@ -98,4 +100,30 @@ export function agruparPorDia<T extends { inicio: string }>(clases: T[]): { fech
     dias.set(fecha, [...(dias.get(fecha) ?? []), clase]);
   }
   return [...dias.entries()].map(([fecha, delDia]) => ({ fecha, clases: delDia }));
+}
+
+// ---------------------------------------------------------------------------
+// H6 · Cancelación de mi reserva (FE-6.1)
+// ---------------------------------------------------------------------------
+
+/** El miembro puede cancelar hasta 2 horas antes del inicio de la clase (S10, BE-6.1). */
+export const HORAS_MINIMAS_CANCELACION = 2;
+const MS_MINIMOS_CANCELACION = HORAS_MINIMAS_CANCELACION * 60 * 60 * 1000;
+
+/**
+ * El botón Cancelar solo aparece en una reserva confirmada cuya clase empieza
+ * en 2 horas o más. Es solo para la pantalla: quien decide es el backend.
+ */
+export function puedeCancelar(reserva: Pick<MiReserva, 'estado' | 'clase'>, ahora: Date = new Date()): boolean {
+  return (
+    reserva.estado === 'CONFIRMADA' &&
+    new Date(reserva.clase.inicio).getTime() - ahora.getTime() >= MS_MINIMOS_CANCELACION
+  );
+}
+
+/** "¿Cancelar tu reserva de Yoga del 18/11/2026 a las 07:00?" (fecha y hora de El Salvador). */
+export function preguntaCancelacion(reserva: Pick<MiReserva, 'clase'>): string {
+  const { clase } = reserva;
+  const [anio, mes, dia] = fechaLocal(clase.inicio).split('-');
+  return `¿Cancelar tu reserva de ${clase.tipo.nombre} del ${dia}/${mes}/${anio} a las ${horaLocal(clase.inicio)}?`;
 }
