@@ -6,10 +6,12 @@ import { obtenerUsuario } from '@/lib/dal';
 import {
   campoDelMensaje,
   validarClase,
+  validarMotivoCancelacion,
   validarTipoClase,
   type DatosClase,
   type DatosTipoClase,
   type ResultadoAccion,
+  type ResultadoCancelacionClase,
 } from '@/lib/clases';
 
 /**
@@ -101,4 +103,35 @@ export async function guardarClase(
 
   revalidatePath('/admin/clases');
   return { ok: true, mensaje: id ? 'Clase actualizada' : 'Clase programada' };
+}
+
+/**
+ * FE-7.1 · Cancela una clase futura con su motivo (BE-7.1:
+ * POST /clases/:id/cancelar). El backend cancela las reservas confirmadas y
+ * avisa a los miembros; aquí solo se valida el motivo para responder rápido.
+ */
+export async function cancelarClase(id: string, motivo: string): Promise<ResultadoCancelacionClase> {
+  const denegado = await verificarAdministrador();
+  if (denegado) return { ok: false, error: denegado.ok ? 'Acceso denegado' : denegado.error };
+  if (!UUID.test(id)) return { ok: false, error: 'La clase no existe.' };
+
+  const invalido = validarMotivoCancelacion(motivo);
+  if (invalido) return { ok: false, error: invalido, campo: 'motivo' };
+
+  try {
+    const { reservasCanceladas } = await api<{ id: string; estado: string; reservasCanceladas: number }>(
+      `clases/${id}/cancelar`,
+      { method: 'POST', body: { motivo: motivo.trim() } },
+    );
+    revalidatePath('/admin/clases');
+    return { ok: true, reservasCanceladas };
+  } catch (error) {
+    if (error instanceof ApiError) {
+      // 409: la clase ya empezó o ya estaba cancelada; la agenda se vuelve a pedir para mostrarlo.
+      if (error.estado === 409) revalidatePath('/admin/clases');
+      return { ok: false, error: error.message, campo: /motivo/i.test(error.message) ? 'motivo' : undefined };
+    }
+    const traducido = traducirError(error);
+    return { ok: false, error: traducido.ok ? 'No se pudo cancelar la clase.' : traducido.error };
+  }
 }
