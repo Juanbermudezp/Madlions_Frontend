@@ -225,3 +225,43 @@ export function campoDelMensaje(mensaje: string): string | undefined {
   if (/^(La fecha|La hora|Las horas)/.test(mensaje)) return 'horario';
   return undefined;
 }
+
+// ---------------------------------------------------------------------------
+// H7 · Cancelación de una clase por el administrador (FE-7.1)
+// ---------------------------------------------------------------------------
+
+export const MOTIVO_MINIMO = 10;
+export const MOTIVO_MAXIMO = 250;
+
+export const MENSAJES_CANCELACION_CLASE = {
+  motivoInvalido: `El motivo debe tener entre ${MOTIVO_MINIMO} y ${MOTIVO_MAXIMO} caracteres`,
+  /** "Se cancelarán {n} reservas y se avisará a los miembros" (ficha de FE-7.1). */
+  reservasAfectadas: (n: number) =>
+    n === 0
+      ? 'La clase no tiene reservas confirmadas: nadie recibirá aviso.'
+      : n === 1
+        ? 'Se cancelará 1 reserva y se avisará al miembro.'
+        : `Se cancelarán ${n} reservas y se avisará a los miembros.`,
+  /** "Clase cancelada. {n} miembros fueron notificados." (ficha de FE-7.1). */
+  exito: (n: number) =>
+    n === 1 ? 'Clase cancelada. 1 miembro fue notificado.' : `Clase cancelada. ${n} miembros fueron notificados.`,
+} as const;
+
+/** Motivo de 10 a 250 caracteres sin contar los espacios de los extremos (BE-7.1). */
+export function validarMotivoCancelacion(motivo: string): string | null {
+  const largo = motivo.trim().length;
+  return largo >= MOTIVO_MINIMO && largo <= MOTIVO_MAXIMO ? null : MENSAJES_CANCELACION_CLASE.motivoInvalido;
+}
+
+/**
+ * El botón "Cancelar clase" solo aparece en clases "Programadas" que aún no
+ * empiezan (criterios 5 y 6 de H7). Es la misma regla que para modificarla.
+ */
+export function esCancelable(clase: ClaseAgenda, ahora: Date = new Date()): boolean {
+  return esModificable(clase, ahora);
+}
+
+/** Resultado de la Server Action de cancelación. */
+export type ResultadoCancelacionClase =
+  | { ok: true; reservasCanceladas: number }
+  | { ok: false; error: string; campo?: 'motivo' };
