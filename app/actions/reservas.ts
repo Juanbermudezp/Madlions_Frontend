@@ -6,6 +6,7 @@ import {
   type ClaseReservable,
   type MiReserva,
   type PestanaReservas,
+  type ResultadoCancelacion,
   type ResultadoLista,
   type ResultadoReserva,
   type SemanaReservable,
@@ -60,5 +61,22 @@ export async function listarMisReservas(pestana: PestanaReservas): Promise<Resul
     return { ok: true, datos: await api<MiReserva[]>(`reservas/mias?estado=${pestana}`) };
   } catch (error) {
     return { ok: false, error: mensajeDeError(error, 'consultar tus reservas') };
+  }
+}
+
+/**
+ * FE-6.1 · Cancela una reserva propia. Sin cuerpo: el backend compara el dueño
+ * de la reserva con el token y valida el plazo de 2 horas.
+ */
+export async function cancelarReserva(reservaId: string): Promise<ResultadoCancelacion> {
+  if (!UUID.test(reservaId)) return { ok: false, error: 'La reserva no existe.' };
+  try {
+    const { lugaresDisponibles } = await api<{ id: string; estado: string; lugaresDisponibles: number }>(
+      `reservas/${reservaId}/cancelar`,
+      { method: 'POST' },
+    );
+    return { ok: true, lugaresDisponibles };
+  } catch (error) {
+    return { ok: false, error: mensajeDeError(error, 'cancelar la reserva') };
   }
 }
