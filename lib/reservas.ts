@@ -21,6 +21,8 @@ export interface ClaseReservable {
   entrenador: { id: string; nombre: string };
   inicio: string;
   fin: string;
+  /** Cupo máximo de la clase. Lo agrega la API del rediseño (H7); sin él se usan cantidades fijas para el color. */
+  cupoMaximo?: number;
   lugaresDisponibles: number;
   yaReservada: boolean;
 }
