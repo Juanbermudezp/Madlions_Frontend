@@ -63,6 +63,7 @@ export const MENU_POR_ROL: Record<Rol, OpcionMenu[]> = {
     { etiqueta: 'Sesiones personales', href: '/miembro/sesiones', historia: 'H9' },
     { etiqueta: 'Mis rutinas', href: '/miembro/rutinas', historia: 'H15' },
     { etiqueta: 'Mi progreso', href: '/miembro/progreso', historia: 'H16' },
+    { etiqueta: 'Pendientes de calificar', href: '/miembro/calificar', historia: 'H20' },
     { etiqueta: 'Mis pagos', href: '/miembro/pagos', historia: 'H12' },
     { etiqueta: 'Estado del equipo', href: '/miembro/equipo', historia: 'H17' },
     { etiqueta: 'Avisos', href: '/miembro/avisos', historia: 'H23' },
