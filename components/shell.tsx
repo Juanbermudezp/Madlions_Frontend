@@ -2,6 +2,8 @@ import { logout } from '@/app/actions/auth';
 import { obtenerUsuario } from '@/lib/dal';
 import { ETIQUETA_ROL, MENU_POR_ROL } from '@/lib/roles';
 import { Menu } from './menu';
+import { CampanaAvisos } from './avisos/campana-avisos';
+import { ContadorAvisos } from './avisos/contador-avisos';
 
 /**
  * Marco de las pantallas con sesión.
@@ -29,17 +31,21 @@ export async function Shell({ children }: { children: React.ReactNode }) {
             <p className="text-xs text-zinc-500">{ETIQUETA_ROL[usuario.rol]}</p>
           </div>
 
-          <form action={logout}>
-            <button
-              type="submit"
-              className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
-            >
-              Cerrar sesión
-            </button>
-          </form>
+          <div className="flex items-center gap-2">
+            {usuario.rol === 'MIEMBRO' && <CampanaAvisos />}
+            <form action={logout}>
+              <button
+                type="submit"
+                className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+              >
+                Cerrar sesión
+              </button>
+            </form>
+          </div>
         </header>
 
         <main className="flex flex-1 flex-col p-6">{children}</main>
+        {usuario.rol === 'MIEMBRO' && <ContadorAvisos />}
       </div>
     </div>
   );
