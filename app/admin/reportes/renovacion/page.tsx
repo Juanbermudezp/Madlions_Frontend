@@ -1,9 +1,18 @@
 import type { Metadata } from 'next';
-import { VacioReporte } from '@/components/reportes/estados-reporte';
+import { connection } from 'next/server';
+import { redirect } from 'next/navigation';
+import { obtenerReporteRenovacion } from '@/app/actions/reportes';
+import { AccesoDenegado } from '@/components/acceso-denegado';
+import { ReporteRenovacion } from '@/components/reportes/reporte-renovacion';
+import { rangoPorDefecto } from '@/lib/reportes';
 
 export const metadata: Metadata = { title: 'Tasa de renovación y cancelación | Madlions' };
 
-/** Lugar reservado para H28: reemplazar con la pantalla del reporte. */
-export default function Page() {
-  return <VacioReporte mensaje="Tasa de renovación y cancelación" detalle="Este reporte se agrega con H28." />;
+export default async function Page() {
+  await connection();
+  const rango = rangoPorDefecto();
+  const inicial = await obtenerReporteRenovacion(rango);
+  if (!inicial.ok && inicial.estado === 401) redirect('/login');
+  if (!inicial.ok && inicial.estado === 403) return <AccesoDenegado />;
+  return <ReporteRenovacion inicial={inicial} rangoInicial={rango} />;
 }
