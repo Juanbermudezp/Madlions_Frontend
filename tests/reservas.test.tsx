@@ -1,14 +1,17 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ClasesDeLaSemana } from "@/components/reservas/clases-semana";
 import { MisReservas } from "@/components/reservas/mis-reservas";
-import { listarClasesReservables, listarMisReservas, reservarClase } from "@/app/actions/reservas";
-import { agruparPorDia, lunesDeSemana, textoLugares, type ClaseReservable, type MiReserva } from "@/lib/reservas";
+import { cancelarReserva, listarClasesReservables, listarMisReservas, reservarClase } from "@/app/actions/reservas";
+import {
+  agruparPorDia, lunesDeSemana, preguntaCancelacion, puedeCancelar, textoLugares, type ClaseReservable, type MiReserva,
+} from "@/lib/reservas";
 
 vi.mock("@/app/actions/reservas", () => ({
   listarClasesReservables: vi.fn(),
   reservarClase: vi.fn(),
   listarMisReservas: vi.fn(),
+  cancelarReserva: vi.fn(),
 }));
 
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
@@ -156,5 +159,108 @@ describe("FE-5.2 Mis reservas", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Pasadas" }));
     expect(await screen.findByText("No tienes reservas")).toBeTruthy();
     expect(listarMisReservas).toHaveBeenCalledWith("pasadas");
+  });
+});
+
+describe("FE-6.1 Cancelación desde Mis reservas", () => {
+  // Miércoles 18/11/2026, 04:00 en El Salvador. Yoga empieza a las 07:00 (3 horas después).
+  const AHORA = new Date("2026-11-18T10:00:00.000Z");
+  const reserva = ({
+    id = "44444444-4444-4444-4444-444444444444",
+    nombre = "Yoga",
+    inicio = "2026-11-18T13:00:00.000Z",
+    estado = "CONFIRMADA",
+  }: { id?: string; nombre?: string; inicio?: string; estado?: MiReserva["estado"] } = {}): MiReserva => ({
+    id, estado, creadaEn: "2026-11-17T15:00:00.000Z",
+    clase: { id: "c", tipo: { id: "t", nombre }, entrenador: { id: "e", nombre: "Ana Hernández" },
+      inicio, fin: new Date(new Date(inicio).getTime() + 3_600_000).toISOString(), estado: "PROGRAMADA" },
+  });
+  const conMinutos = (minutos: number) => new Date(AHORA.getTime() + minutos * 60_000).toISOString();
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(AHORA);
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("puedeCancelar: 3 horas y 2 horas exactas sí; 1 hora 59 minutos, ya iniciada o cancelada no", () => {
+    expect(puedeCancelar(reserva({ inicio: conMinutos(180) }), AHORA)).toBe(true);
+    expect(puedeCancelar(reserva({ inicio: conMinutos(120) }), AHORA)).toBe(true);
+    expect(puedeCancelar(reserva({ inicio: conMinutos(119) }), AHORA)).toBe(false);
+    expect(puedeCancelar(reserva({ inicio: conMinutos(-10) }), AHORA)).toBe(false);
+    expect(puedeCancelar(reserva({ estado: "CANCELADA_MIEMBRO" }), AHORA)).toBe(false);
+    expect(puedeCancelar(reserva({ estado: "CANCELADA_GIMNASIO" }), AHORA)).toBe(false);
+  });
+
+  it("la pregunta usa la fecha y la hora de El Salvador", () => {
+    expect(preguntaCancelacion(reserva())).toBe("¿Cancelar tu reserva de Yoga del 18/11/2026 a las 07:00?");
+  });
+
+  it("el botón Cancelar solo aparece en las confirmadas que empiezan en 2 horas o más", () => {
+    render(<MisReservas inicial={{ ok: true, datos: [
+      reserva({ id: "a", nombre: "Yoga" }),
+      reserva({ id: "b", nombre: "Spinning", inicio: conMinutos(119) }),
+      reserva({ id: "c", nombre: "Pilates", estado: "CANCELADA_MIEMBRO" }),
+    ] }} />);
+
+    expect(screen.getByRole("button", { name: "Cancelar la reserva de Yoga" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Cancelar la reserva de Spinning" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Cancelar la reserva de Pilates" })).toBeNull();
+  });
+
+  it("confirma, muestra \"Reserva cancelada\" y la etiqueta cambia sin recargar la lista", async () => {
+    vi.mocked(cancelarReserva).mockResolvedValue({ ok: true, lugaresDisponibles: 4 });
+    render(<MisReservas inicial={{ ok: true, datos: [reserva()] }} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar la reserva de Yoga" }));
+    const modal = within(screen.getByRole("dialog", { name: "Cancelar reserva" }));
+    expect(modal.getByText("¿Cancelar tu reserva de Yoga del 18/11/2026 a las 07:00?")).toBeTruthy();
+    fireEvent.click(modal.getByRole("button", { name: "Cancelar reserva" }));
+
+    expect((await screen.findByRole("status")).textContent).toContain("Reserva cancelada");
+    expect(cancelarReserva).toHaveBeenCalledWith("44444444-4444-4444-4444-444444444444");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByText("Cancelada por el miembro")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Cancelar la reserva de Yoga" })).toBeNull();
+    expect(listarMisReservas).not.toHaveBeenCalled();
+  });
+
+  it("el botón se desactiva mientras se envía", async () => {
+    let responder!: (r: { ok: true; lugaresDisponibles: number }) => void;
+    vi.mocked(cancelarReserva).mockReturnValue(new Promise((r) => { responder = r; }));
+    render(<MisReservas inicial={{ ok: true, datos: [reserva()] }} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar la reserva de Yoga" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar reserva" }));
+
+    const enviando = await screen.findByRole("button", { name: "Cancelando…" });
+    expect((enviando as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Volver" }) as HTMLButtonElement).disabled).toBe(true);
+    responder({ ok: true, lugaresDisponibles: 4 });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("muestra el mensaje del backend y recarga la lista si ya no está en plazo", async () => {
+    const motivo = "Solo puedes cancelar hasta 2 horas antes del inicio de la clase";
+    vi.mocked(cancelarReserva).mockResolvedValue({ ok: false, error: motivo });
+    vi.mocked(listarMisReservas).mockResolvedValue({ ok: true, datos: [reserva()] });
+    render(<MisReservas inicial={{ ok: true, datos: [reserva()] }} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar la reserva de Yoga" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar reserva" }));
+
+    const modal = within(screen.getByRole("dialog", { name: "Cancelar reserva" }));
+    expect((await modal.findByRole("alert")).textContent).toBe(motivo);
+    await waitFor(() => expect(listarMisReservas).toHaveBeenCalledWith("proximas"));
+  });
+
+  it("Volver cierra la confirmación sin cancelar", () => {
+    render(<MisReservas inicial={{ ok: true, datos: [reserva()] }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar la reserva de Yoga" }));
+    fireEvent.click(screen.getByRole("button", { name: "Volver" }));
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(cancelarReserva).not.toHaveBeenCalled();
+    expect(screen.getByText("Confirmada")).toBeTruthy();
   });
 });
