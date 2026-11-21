@@ -5,6 +5,7 @@ import { obtenerUsuario } from '@/lib/dal';
 import { MENSAJES_REPORTES, validarRango, type RangoReporte, type ReporteOcupacion, type Resultado } from '@/lib/reportes';
 import type { ConceptoCobro } from '@/lib/pagos';
 import { CONCEPTOS_INGRESOS, esDetalleIngresos, esReporteIngresos, type DetalleIngresos, type ReporteIngresos } from '@/lib/reportes-ingresos';
+import { esReporteRenovacion, type ReporteRenovacion } from '@/lib/reportes-renovacion';
 
 /**
  * Server Actions de los reportes (Módulo 10). Corren en el servidor de Next,
@@ -33,6 +34,20 @@ async function pedir<T>(ruta: string, rango: RangoReporte, contexto: string, par
 /** FE-26.1 · Reporte de ocupación de clases grupales (BE-26.1). */
 export async function obtenerReporteOcupacion(rango: RangoReporte): Promise<Resultado<ReporteOcupacion>> {
   return pedir<ReporteOcupacion>('reportes/ocupacion', rango, 'el reporte de ocupación');
+}
+
+/** FE-28.1: mismo cliente, rol y errores de reportes, sin repetir /api/v1. */
+export async function obtenerReporteRenovacion(rango: RangoReporte): Promise<Resultado<ReporteRenovacion>> {
+  if (!rango || typeof rango.desde !== 'string' || typeof rango.hasta !== 'string') {
+    return { ok: false, estado: 400, error: MENSAJES_REPORTES.fechaInvalida };
+  }
+  const error = validarRango(rango);
+  if (error) return { ok: false, estado: 400, error };
+  const res = await pedir<unknown>('reportes/renovacion', rango, 'el reporte de renovación');
+  if (!res.ok) return res.estado && res.estado >= 500
+    ? { ok: false, estado: res.estado, error: 'El servidor no pudo consultar la renovación. Intenta de nuevo.' } : res;
+  if (!esReporteRenovacion(res.datos)) return { ok: false, error: 'La respuesta del reporte de renovación no es válida.' };
+  return { ok: true, datos: res.datos };
 }
 
 function errorRangoIngresos(rango: RangoReporte): string | null {
