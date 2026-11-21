@@ -1,6 +1,14 @@
 import type { ReporteIngresos, PagoIngreso } from '@/lib/reportes-ingresos';
 
 export const RANGO_INGRESOS = { desde: '2026-11-18', hasta: '2026-11-20' };
+/** QA-27.1 A: valores literales calculados a mano, independientes de H27. */
+export const INGRESOS_A: ReporteIngresos = {
+  total: 192.1, subtotal: 170, iva: 22.1,
+  porConcepto: [{ concepto: 'MEMBRESIA', total: 113 }, { concepto: 'RENOVACION', total: 56.5 }, { concepto: 'SESION_ADICIONAL', total: 22.6 }],
+  porTipoPlan: [{ tipoPlan: 'DAYPASS', total: 113 }, { tipoPlan: 'MENSUAL', total: 56.5 }, { tipoPlan: 'SET_CLASES', total: 0 }],
+  porDia: [{ fecha: '2026-11-01', total: 169.5 }, { fecha: '2026-11-02', total: 22.6 }],
+  anterior: { total: 113, diferencia: 79.1, porcentaje: 70 },
+};
 export const INGRESOS: ReporteIngresos = {
   total: 1130, subtotal: 1000, iva: 130,
   porConcepto: [{ concepto: 'MEMBRESIA', total: 500 }, { concepto: 'RENOVACION', total: 400 }, { concepto: 'SESION_ADICIONAL', total: 230 }],

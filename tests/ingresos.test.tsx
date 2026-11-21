@@ -7,7 +7,7 @@ import { exportarReportePDF } from '@/lib/exportar-pdf';
 import type { Resultado } from '@/lib/reportes';
 import type { DetalleIngresos, ReporteIngresos as Reporte } from '@/lib/reportes-ingresos';
 import { sumarDias } from '@/lib/clases';
-import { INGRESOS, INGRESOS_CERO, paginaIngresos, pagoIngreso, RANGO_INGRESOS } from './ingresos-fixtures';
+import { INGRESOS, INGRESOS_A, INGRESOS_CERO, paginaIngresos, pagoIngreso, RANGO_INGRESOS } from './ingresos-fixtures';
 
 vi.mock('@/app/actions/reportes', () => ({ obtenerReporteIngresos: vi.fn(), obtenerDetalleIngresos: vi.fn() }));
 vi.mock('@/lib/exportar-pdf', async (original) => ({ ...(await original<typeof import('@/lib/exportar-pdf')>()), exportarReportePDF: vi.fn() }));
@@ -27,6 +27,29 @@ const abrir = async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Ver detalle de membresías' }));
   return within(await screen.findByRole('dialog'));
 };
+
+it('QA-27.1 A presenta los importes conocidos del contrato en tarjetas, gráfica, tablas y PDF', async () => {
+  render(<ReporteIngresos inicial={{ ok: true, datos: INGRESOS_A }} rangoInicial={{ desde: '2026-11-01', hasta: '2026-11-02' }} />);
+  for (const [region, importe] of [['Ingresos totales', '$192.10'], ['Subtotal', '$170.00'], ['IVA (13 %)', '$22.10']]) {
+    expect(within(screen.getByRole('region', { name: region })).getByText(importe)).toBeTruthy();
+  }
+  const comparacion = within(screen.getByRole('region', { name: 'Comparación con período anterior' }));
+  expect(comparacion.getByText('+$79.10')).toBeTruthy(); expect(comparacion.getByText('+70.0 %')).toBeTruthy();
+  expect([...screen.getByRole('img').querySelectorAll('title')].map((t) => t.textContent))
+    .toEqual(['01/11/2026: $169.50', '02/11/2026: $22.60']);
+  const conceptos = within(screen.getByRole('region', { name: 'Ingresos por concepto' }));
+  for (const importe of ['$113.00', '$56.50', '$22.60']) expect(conceptos.getByText(importe)).toBeTruthy();
+  const planes = within(screen.getByRole('region', { name: 'Ingresos por tipo de plan' }));
+  for (const importe of ['$113.00', '$56.50', '$0.00']) expect(planes.getByText(importe)).toBeTruthy();
+  fireEvent.click(screen.getByText('Ver ingresos diarios en tabla'));
+  expect(within(screen.getByRole('table', { name: 'Ingresos diarios en dólares' })).getByText('$169.50')).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Exportar PDF' }));
+  await waitFor(() => expect(exportarReportePDF).toHaveBeenCalledOnce());
+  expect(vi.mocked(exportarReportePDF).mock.calls[0][0]).toMatchObject({
+    rango: { desde: '2026-11-01', hasta: '2026-11-02' },
+    filas: expect.arrayContaining([['Totales', 'Subtotal', '$170.00'], ['Comparación', 'Variación', '+70.0 %']]),
+  });
+});
 
 it('presenta período, cuatro tarjetas y valores del servidor con dos decimales', () => {
   mostrar({ ...INGRESOS, subtotal: 987.65, iva: 142.35 }); // No recalcular el IVA en UI.
