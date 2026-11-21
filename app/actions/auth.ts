@@ -1,7 +1,13 @@
-"use server";
+'use server';
 
-import { redirect } from "next/navigation";
-import { createSession, deleteSession } from "@/lib/session";
+import { redirect } from 'next/navigation';
+import { api, ApiError, SesionInvalidaError } from '@/lib/api';
+import {
+  borrarSesion,
+  crearSesion,
+  obtenerRefreshToken,
+} from '@/lib/session';
+import { INICIO_POR_ROL, type Usuario } from '@/lib/roles';
 
 export type LoginState = {
   error?: string;
@@ -10,68 +16,66 @@ export type LoginState = {
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-// Llama a la API de autenticación. Devuelve el token si las credenciales son
-// válidas, o null si la API responde 401/403.
-async function authenticate(email: string, password: string) {
-  const apiUrl = process.env.API_URL;
-  if (!apiUrl) {
-    throw new Error("Falta la variable de entorno API_URL.");
-  }
-
-  const res = await fetch(new URL("auth/login", apiUrl.replace(/\/?$/, "/")), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password }),
-    cache: "no-store",
-  });
-
-  if (res.status === 401 || res.status === 403) {
-    return null;
-  }
-  if (!res.ok) {
-    throw new Error(`auth/login respondió ${res.status}`);
-  }
-
-  // Ajustar al formato de respuesta real de la API.
-  const data = await res.json();
-  const token: string | undefined =
-    data.token ?? data.accessToken ?? data.access_token;
-  if (!token) {
-    throw new Error("La respuesta de auth/login no incluye un token.");
-  }
-  return token;
+interface RespuestaLogin {
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+  user: Usuario;
 }
 
 export async function login(
   _prevState: LoginState,
   formData: FormData,
 ): Promise<LoginState> {
-  const email = String(formData.get("email") ?? "").trim();
-  const password = String(formData.get("password") ?? "");
+  const email = String(formData.get('email') ?? '').trim();
+  const password = String(formData.get('password') ?? '');
 
   if (!email || !password) {
-    return { error: "Ingresa tu correo y contraseña.", email };
+    return { error: 'Ingresa tu correo y contraseña.', email };
   }
   if (!EMAIL_REGEX.test(email)) {
-    return { error: "Ingresa un correo válido.", email };
+    return { error: 'Ingresa un correo válido.', email };
   }
 
-  let token: string | null;
+  let datos: RespuestaLogin;
   try {
-    token = await authenticate(email, password);
+    datos = await api<RespuestaLogin>('auth/login', {
+      method: 'POST',
+      body: { email, password },
+      conToken: false,
+    });
   } catch (error) {
-    console.error("Error al iniciar sesión:", error);
-    return { error: "No se pudo iniciar sesión. Intenta más tarde.", email };
-  }
-  if (!token) {
-    return { error: "Correo o contraseña incorrectos.", email };
+    if (error instanceof SesionInvalidaError) {
+      return { error: 'Correo o contraseña incorrectos.', email };
+    }
+    if (error instanceof ApiError) {
+      console.error('Error al iniciar sesión:', error.estado, error.message);
+    } else {
+      console.error('Error al iniciar sesión:', error);
+    }
+    return { error: 'No se pudo iniciar sesión. Intenta más tarde.', email };
   }
 
-  await createSession(token);
-  redirect("/");
+  await crearSesion(datos.accessToken, datos.refreshToken, datos.expiresIn);
+
+  redirect(INICIO_POR_ROL[datos.user.rol]);
 }
 
 export async function logout() {
-  await deleteSession();
-  redirect("/login");
+  const refreshToken = await obtenerRefreshToken();
+
+  if (refreshToken) {
+    try {
+      await api<void>('auth/logout', {
+        method: 'POST',
+        body: { refreshToken },
+        conToken: false,
+      });
+    } catch (error) {
+      console.error('Error al cerrar sesión en el backend:', error);
+    }
+  }
+
+  await borrarSesion();
+  redirect('/login');
 }

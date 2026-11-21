@@ -1,33 +1,28 @@
-import type { Metadata } from "next";
-import { redirect } from "next/navigation";
-import { getSession } from "@/lib/session";
-import { CalendarioHorarios } from "./calendario-horarios";
+import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
+import { obtenerSemanaHorarios } from '@/app/actions/horarios';
+import { AccesoDenegado } from '@/components/acceso-denegado';
+import { ErrorCarga } from '@/components/clases/estado-carga';
+import { CalendarioHorarios } from '@/components/horarios/calendario-horarios';
+import { hoyLocal } from '@/lib/horarios';
 
-export const metadata: Metadata = {
-    title: "Mis horarios",
-};
+export const metadata: Metadata = { title: 'Mis horarios | Madlions' };
 
-function rolDelToken(token: string): string | null {
-    try {
-        const payload = JSON.parse(
-            Buffer.from(token.split(".")[1] ?? "", "base64url").toString("utf8"),
-        ) as { rol?: unknown };
-        return typeof payload.rol === "string" ? payload.rol : null;
-    } catch {
-        return null;
-    }
-}
-
-export default async function HorariosPage() {
-    const token = await getSession();
-    if (!token || rolDelToken(token) !== "ENTRENADOR") {
-        redirect("/");
-    }
+/** FE-8.1: calendario semanal del entrenador (el layout ya limita /entrenador al ENTRENADOR). */
+export default async function Page() {
+    const inicial = await obtenerSemanaHorarios(hoyLocal());
+    if (!inicial.ok && inicial.estado === 401) redirect('/login');
+    if (!inicial.ok && inicial.estado === 403) return <AccesoDenegado />;
 
     return (
-        <main className="mx-auto w-full max-w-6xl px-4 py-6">
-            <h1 className="mb-4 text-2xl font-semibold">Mis horarios</h1>
-            <CalendarioHorarios />
-        </main>
+        <div className="flex w-full flex-col gap-4">
+            <header>
+                <h1 className="text-2xl font-semibold">Mis horarios</h1>
+                <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                    Define los bloques en los que los miembros pueden agendar sesiones contigo. Toca un espacio libre para agregar uno.
+                </p>
+            </header>
+            {inicial.ok ? <CalendarioHorarios inicial={inicial} /> : <ErrorCarga mensaje={inicial.error} />}
+        </div>
     );
 }

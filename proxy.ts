@@ -1,26 +1,37 @@
-import { NextResponse, type NextRequest } from "next/server";
-import { SESSION_COOKIE } from "@/lib/session";
+import { NextResponse, type NextRequest } from 'next/server';
+import { COOKIE_REFRESH, COOKIE_TOKEN, leerPayload } from '@/lib/token';
+import { INICIO_POR_ROL } from '@/lib/roles';
 
-const publicRoutes = ["/login"];
+const RUTAS_PUBLICAS = ['/login'];
 
-// Chequeo optimista: solo verifica que exista la cookie de sesión.
-// Si el backend expone un token verificable (p. ej. JWT), validarlo aquí.
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const isPublicRoute = publicRoutes.includes(pathname);
-  const hasSession = Boolean(request.cookies.get(SESSION_COOKIE)?.value);
+  const esPublica = RUTAS_PUBLICAS.includes(pathname);
 
-  if (!isPublicRoute && !hasSession) {
-    return NextResponse.redirect(new URL("/login", request.nextUrl));
+  const token = request.cookies.get(COOKIE_TOKEN)?.value;
+  const payload = leerPayload(token);
+  const vencido = !payload || payload.exp * 1000 <= Date.now();
+
+  if (vencido) {
+    if (esPublica) return NextResponse.next();
+
+    const respuesta = NextResponse.redirect(new URL('/login', request.nextUrl));
+    respuesta.cookies.delete(COOKIE_TOKEN);
+    respuesta.cookies.delete(COOKIE_REFRESH);
+    return respuesta;
   }
 
-  if (isPublicRoute && hasSession) {
-    return NextResponse.redirect(new URL("/", request.nextUrl));
+  if (esPublica || pathname === '/') {
+    return NextResponse.redirect(
+      new URL(INICIO_POR_ROL[payload.rol], request.nextUrl),
+    );
   }
 
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)"],
+  matcher: [
+    '/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
+  ],
 };

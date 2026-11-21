@@ -1,17 +1,10 @@
-import { logout } from "@/app/actions/auth";
+import { redirect } from 'next/navigation';
+import { obtenerUsuario } from '@/lib/dal';
+import { INICIO_POR_ROL } from '@/lib/roles';
 
-export default function Home() {
-  return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-6">
-      <h1 className="text-4xl font-semibold">Hello world</h1>
-      <form action={logout}>
-        <button
-          type="submit"
-          className="rounded-md border border-zinc-300 px-4 py-2 text-sm dark:border-zinc-700"
-        >
-          Cerrar sesión
-        </button>
-      </form>
-    </div>
-  );
+export default async function Inicio() {
+  const usuario = await obtenerUsuario();
+
+  if (!usuario) redirect('/login');
+  redirect(INICIO_POR_ROL[usuario.rol]);
 }
