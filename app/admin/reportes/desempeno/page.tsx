@@ -1,9 +1,18 @@
 import type { Metadata } from 'next';
-import { VacioReporte } from '@/components/reportes/estados-reporte';
+import { redirect } from 'next/navigation';
+import { obtenerReporteDesempeno } from '@/app/actions/desempeno';
+import { AccesoDenegado } from '@/components/acceso-denegado';
+import { ReporteDesempeno } from '@/components/reportes/reporte-desempeno';
+import { rangoPorDefecto } from '@/lib/reportes';
 
 export const metadata: Metadata = { title: 'Reporte de desempeño de entrenadores | Madlions' };
 
-/** Lugar reservado para H29: reemplazar con la pantalla del reporte. */
-export default function Page() {
-  return <VacioReporte mensaje="Reporte de desempeño de entrenadores" detalle="Este reporte se agrega con H29." />;
+/** FE-29.1 · Pestaña Desempeño: los últimos 30 días al abrir. */
+export default async function Page() {
+  const rango = rangoPorDefecto();
+  const inicial = await obtenerReporteDesempeno(rango);
+  if (!inicial.ok && inicial.estado === 401) redirect('/login');
+  if (!inicial.ok && inicial.estado === 403) return <AccesoDenegado />;
+
+  return <ReporteDesempeno inicial={inicial} rangoInicial={rango} />;
 }
